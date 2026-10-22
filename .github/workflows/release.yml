@@ -145,6 +145,7 @@ jobs:
             echo "- Windows: download the EXE or extract the standalone ZIP."
             echo "- Linux: download the executable or extract the TAR.GZ archive."
             echo
+            echo "This is automatically generated"
             echo "RELEASE_NOTES_EOF"
           } >> "$GITHUB_OUTPUT"
 
