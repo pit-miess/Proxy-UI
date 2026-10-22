@@ -11,13 +11,13 @@ HOST = "server.paedml-linux.lokal"
 PORT = 3128
 
 LOCAL_HOST = "127.0.0.1"
-LOCAL_PORT = 8080
+LOCAL_PORT = 3128
 
 SCHEME = "http"
-NEEDS_AUTH = False  # default: True
+NEEDS_AUTH = True  # default: True
 
 #DEBUG ONLY
-BYPASS_PROXY = True # default: False
+BYPASS_PROXY = False # default: False
 
 
 config = ProxyConfig(
