@@ -1,0 +1,123 @@
+
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          if (Test-Path requirements.txt) {
+            pip install -r requirements.txt
+          }
+          pip install pyinstaller
+
+      - name: Build EXE
+        run: |
+          pyinstaller --noconsole --onefile --name "Proxy-UI-onefile-windows" "main.py"
+
+      - name: Build Standalone EXE
+        run: |
+          pyinstaller --noconsole --onedir --name "Proxy-UI-standalone-windows" "main.py"
+
+      - name: Zip Standalone Build
+        run: |
+          Compress-Archive `
+            -Path "dist/Proxy-UI-standalone-windows/*" `
+            -DestinationPath "dist/Proxy-UI-standalone-windows.zip"
+
+      - name: Upload Windows Builds
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-build
+          path: |
+            dist/Proxy-UI-onefile-windows.exe
+            dist/Proxy-UI-standalone-windows.zip
+
+  build-linux:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          fi
+          pip install pyinstaller
+
+      - name: Build Linux Executable
+        run: |
+          pyinstaller --noconsole --onefile \
+            --name "Proxy-UI-onefile-linux" main.py
+
+      - name: Build Linux Standalone
+        run: |
+          pyinstaller --noconsole --onedir \
+            --name "Proxy-UI-standalone-linux" main.py
+
+      - name: Archive Linux Standalone
+        run: |
+          tar -czf dist/Proxy-UI-standalone-linux.tar.gz \
+            -C dist Proxy-UI-standalone-linux
+
+      - name: Upload Linux Builds
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-build
+          path: |
+            dist/Proxy-UI-onefile-linux
+            dist/Proxy-UI-standalone-linux.tar.gz
+
+  release:
+    needs: [build-windows, build-linux]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download All Builds
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "Proxy-UI ${{ github.ref_name }}"
+          body_path: "release-notes/${{ github.ref_name }}.md"
+          files: |
+            dist/Proxy-UI-onefile-windows.exe
+            dist/Proxy-UI-standalone-windows.zip
+            dist/Proxy-UI-onefile-linux
+            dist/Proxy-UI-standalone-linux.tar.gz

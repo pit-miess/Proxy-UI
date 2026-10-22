@@ -7,6 +7,8 @@ import keyring
 import keyring.errors
 import requests
 
+VERSION = "1.0.0"
+
 class ScrollableFrame(ttk.Frame):
     def __init__(self, parent, *args, **kwargs):
         super().__init__(parent, *args, **kwargs)
@@ -162,6 +164,8 @@ WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.""")
         self.license_text.config(state="disabled")
         self.license_text.pack(pady=5)
+        self.verison_label = ttk.Label(self.about_frame.scrollable_frame, text=f"Version: {VERSION}")
+        self.verison_label.pack(pady=5)
         self.load_credentials()
 
     def switch_page(self, page_name):
