@@ -8,12 +8,13 @@ class ProxyConfig:
     port: int = 3128
     scheme: str = "http"
     needs_auth: bool = True
+    bypass_proxy: bool = False
 
     def build_url(self, username: str = "", password: str = "") -> str:
-        if self.scheme not in ("http", "https"):
+        if self.scheme.lower() not in ("http", "https"):
             raise ValueError(f"{self.scheme} is currently not supported, only http and https are allowed.")
 
-        if not self.host or not 1 <= self.port <= 65535:
+        if not self.bypass_proxy and (not self.host or not 1 <= self.port <= 65535):
             raise ValueError("Invalid proxy address or port.")
 
         if self.needs_auth:

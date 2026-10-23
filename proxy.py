@@ -25,6 +25,7 @@ config = ProxyConfig(
     port=PORT,
     scheme=SCHEME,
     needs_auth=NEEDS_AUTH,
+    bypass_proxy=BYPASS_PROXY
 )
 
 
@@ -88,7 +89,7 @@ class ForwardProxyHandler(BaseHTTPRequestHandler):
                 self.send_error(400, "Expected hostname:port")
                 return
 
-            if BYPASS_PROXY: # bypass for debugging
+            if self.server.bypass_proxy: # bypass for debugging
                 upstream = socket.create_connection(
                     (parsed.hostname, parsed.port),
                     timeout=15,
@@ -97,7 +98,7 @@ class ForwardProxyHandler(BaseHTTPRequestHandler):
 
             else:
                 upstream = socket.create_connection(
-                    (HOST, PORT),
+                    (self.server.host, self.server.port),
                     timeout=15,
                 )
                 upstream.settimeout(None)
@@ -145,7 +146,7 @@ class ForwardProxyHandler(BaseHTTPRequestHandler):
                     )
                     return
 
-            # Tell the client the tunnel is ready.
+            # Tell client the tunnel is ready.
             self.connection.sendall(b"HTTP/1.1 200 Connection Established\r\n\r\n")
             established = True
 
@@ -231,7 +232,7 @@ class ForwardProxyHandler(BaseHTTPRequestHandler):
             body = self.rfile.read(length) if length else None
             headers = remove_hop_headers(self.headers)
 
-            proxy_url = config.build_url(
+            proxy_url = self.server.config.build_url(
                 self.server.username,
                 self.server.password,
             )
@@ -244,7 +245,7 @@ class ForwardProxyHandler(BaseHTTPRequestHandler):
                 proxies={
                     "http": proxy_url,
                     "https": proxy_url,
-                } if not BYPASS_PROXY else None,
+                } if not self.server.bypass_proxy else None,
                 stream=True,
                 allow_redirects=False,
                 timeout=(15, 30),
@@ -296,7 +297,19 @@ class LocalProxyServer(ThreadingHTTPServer):
     daemon_threads = True
     allow_reuse_address = True
 
-    def __init__(self, address, username, password):
+    def __init__(self, address: tuple[str, int], username: str, password: str, scheme: str, url: str, port: int, needs_auth: bool, bypass_proxy: bool=False):
         super().__init__(address, ForwardProxyHandler)
         self.username = username
         self.password = password
+        self.scheme = scheme
+        self.url = url
+        self.port = port
+        self.needs_auth = needs_auth
+        self.bypass_proxy = bypass_proxy
+        self.config = ProxyConfig(
+            host=self.url,
+            port=self.port,
+            scheme=self.scheme,
+            needs_auth=self.needs_auth,
+            bypass_proxy=self.bypass_proxy
+        )

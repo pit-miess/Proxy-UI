@@ -57,13 +57,14 @@ class ScrollableFrame(ttk.Frame):
             self.canvas.yview_scroll(1, "units")
 
 class MiddleMan(tk.Tk):
-    def __init__(self):
+    def __init__(self, bypass_proxy: bool = False):
         super().__init__()
 
         self.title("Proxy Chain Configuration")
-        self.geometry("440x340")
+        self.geometry("540x440")
         self.protocol("WM_DELETE_WINDOW", self.on_close)
 
+        self.bypass_proxy = bypass_proxy
         self.proxy_config = config
         self.connected = False
         self.username = None
@@ -78,14 +79,28 @@ class MiddleMan(tk.Tk):
         self.login_frame = ttk.Frame(self.tabwidget, padding=12)
         self.tabwidget.add(self.login_frame, text="Login")
 
-        self.username_label = ttk.Label(self.login_frame, text="Username:")
+        self.proxy_frame = ttk.Frame(self.login_frame, padding=12)
+        self.proxy_frame.pack(pady=10)
+        self.proxy_type_dropdown = ttk.Combobox(self.proxy_frame, values=["HTTP", "HTTPS", "SOCKS5"], state="readonly")
+        self.proxy_type_dropdown.set("HTTP")
+        self.proxy_type_dropdown.pack(side="left", padx=5)
+        self.proxy_address_entry = ttk.Entry(self.proxy_frame)
+        self.proxy_address_entry.pack(side="left", padx=5)
+        self.proxy_port_entry = ttk.Entry(self.proxy_frame, width=6)
+        self.proxy_port_entry.pack(side="left", padx=5)
+        self.needs_auth_var = tk.BooleanVar(value=True)
+        self.needs_auth_checkbox = ttk.Checkbutton(self.proxy_frame, text="Needs Auth", variable=self.needs_auth_var, command=self.toggle_auth_fields)
+        self.needs_auth_checkbox.pack(side="left", padx=5)
+        self.auth_frame = ttk.Frame(self.login_frame, padding=12)
+        self.auth_frame.pack(pady=10)
+        self.username_label = ttk.Label(self.auth_frame, text="Username:")
         self.username_label.pack(pady=5)
-        self.username_entry = ttk.Entry(self.login_frame)
+        self.username_entry = ttk.Entry(self.auth_frame)
         self.username_entry.pack(pady=5)
 
-        self.password_label = ttk.Label(self.login_frame, text="Password:")
+        self.password_label = ttk.Label(self.auth_frame, text="Password:")
         self.password_label.pack(pady=5)
-        self.password_entry = ttk.Entry(self.login_frame, show="*")
+        self.password_entry = ttk.Entry(self.auth_frame, show="*")
         self.password_entry.pack(pady=5)
 
         self.error_label = ttk.Label(self.login_frame, text="", foreground="red")
@@ -101,7 +116,7 @@ class MiddleMan(tk.Tk):
         self.proxy_status_label = ttk.Label(self.main_frame, text="Proxy status: Not connected")
         self.proxy_status_label.pack(pady=10)
 
-        self.local_address_label = ttk.Label(self.main_frame, text=f"Local proxy: {LOCAL_HOST}:{LOCAL_PORT}")
+        self.local_address_label = ttk.Label(self.main_frame, text=f"Local proxy: N/A:N/A")
         self.local_address_label.pack(pady=5)
 
         self.start_button = ttk.Button(self.main_frame, text="Start Proxy", command=self.start_proxy, state="disabled")
@@ -167,7 +182,21 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SO
         self.verison_label = ttk.Label(self.about_frame.scrollable_frame, text=f"Version: {VERSION}")
         self.verison_label.pack(pady=5)
         self.load_credentials()
-
+    def toggle_auth_fields(self):
+        if self.needs_auth_var.get():
+            self.error_label.pack_forget()
+            self.login_button.pack_forget()
+            for widget in (self.username_label, self.username_entry, self.password_label, self.password_entry):
+                widget.pack(pady=5)
+            self.error_label.pack(pady=5)
+            self.login_button.pack(pady=5)
+        else:
+            for widget in (self.username_label, self.username_entry, self.password_label, self.password_entry):
+                widget.pack_forget()
+            self.login_button.pack_forget()
+            self.error_label.pack_forget()
+            self.error_label.pack(pady=5)
+            self.login_button.pack(pady=5)
     def switch_page(self, page_name):
         for index in range(self.tabwidget.index("end")):
             if self.tabwidget.tab(index, "text") == page_name:
@@ -182,13 +211,24 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SO
         try:
             username = keyring.get_password(SERVICE, "username")
             password = keyring.get_password(SERVICE, "password")
+            proxy_type = keyring.get_password(SERVICE, "proxy_type")
+            proxy_address = keyring.get_password(SERVICE, "proxy_address")
+            try:
+                proxy_port = int(keyring.get_password(SERVICE, "proxy_port"))
+            except (TypeError, ValueError):
+                proxy_port = 0
+            proxy_needs_auth = True if keyring.get_password(SERVICE, "proxy_needs_auth") == "true" else False
 
-            if username and password and self.test_connection(username, password):
-                self.username = username
-                self.password = password
-                self.connected = True
-                self.proxy_status_label.config(text="Upstream proxy: Connected")
-                self.start_button.config(state="normal")
+            if (proxy_type and proxy_address and not proxy_port is None):
+                if proxy_needs_auth and (not username or not password):
+                    self.switch_page("Login")
+                    return
+                if self.test_connection(username, password, proxy_type, proxy_address, proxy_port, proxy_needs_auth):
+                    self.username = username
+                    self.password = password
+                    self.connected = True
+                    self.proxy_status_label.config(text="Upstream proxy: Connected")
+                    self.start_button.config(state="normal")
                 self.switch_page("Main")
             else:
                 self.switch_page("Login")
@@ -196,39 +236,63 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SO
         except Exception:
             self.switch_page("Login")
 
-    def test_connection(self, username, password):
+    def test_connection(self, username, password, proxy_type, proxy_address, proxy_port, proxy_needs_auth):
         try:
-            proxy_url = self.proxy_config.build_url(username, password)
+            temp_config = ProxyConfig(
+                host=proxy_address,
+                port=proxy_port,
+                scheme=proxy_type.lower(),
+                needs_auth=proxy_needs_auth,
+                bypass_proxy=self.bypass_proxy
+            )
+            proxy_url = temp_config.build_url(username, password)
 
             response = requests.get(
                 "https://example.com/",
-                proxies=None if BYPASS_PROXY else {"http": proxy_url, "https": proxy_url},
+                proxies=None if self.bypass_proxy else {"http": proxy_url, "https": proxy_url},
                 timeout=10,
             )
             response.close()
-            return response.status_code < 500
-
-        except (requests.RequestException, ValueError):
+            success = response.status_code < 500
+            if success:
+                self.proxy_config = temp_config
+                return True
+            return False
+        except (requests.RequestException, ValueError) as exc:
+            print(f"Connection test error: {type(exc).__name__}: {exc}")
             return False
 
     def handle_login(self):
         username = self.username_entry.get().strip()
         password = self.password_entry.get()
-
-        if not username or not password:
+        proxy_type = self.proxy_type_dropdown.get().strip()
+        proxy_address = self.proxy_address_entry.get().strip()
+        try:
+            proxy_port = int(self.proxy_port_entry.get().strip())
+        except ValueError:
+            proxy_port = 1
+        proxy_needs_auth = self.needs_auth_var.get()
+        if not self.bypass_proxy and (not proxy_type or not proxy_address or proxy_port is None):
+            self.error_label.config(text="Enter the upstream proxy details.")
+            return
+        if proxy_needs_auth and (not username or not password):
             self.error_label.config(text="Enter both username and password.")
             return
 
         self.error_label.config(text="Checking upstream proxy...")
         self.update_idletasks()
 
-        if not self.test_connection(username, password):
+        if not self.test_connection(username, password, proxy_type, proxy_address, proxy_port, proxy_needs_auth):
             self.error_label.config(text="Connection failed. Check credentials and proxy access.")
             return
 
         try:
             keyring.set_password(SERVICE, "username", username)
             keyring.set_password(SERVICE, "password", password)
+            keyring.set_password(SERVICE, "proxy_type", proxy_type)
+            keyring.set_password(SERVICE, "proxy_address", proxy_address)
+            keyring.set_password(SERVICE, "proxy_port", str(proxy_port))
+            keyring.set_password(SERVICE, "proxy_needs_auth", "true" if proxy_needs_auth else "false")
         except Exception:
             self.error_label.config(text="Could not save credentials to the system keyring.")
             return
@@ -237,6 +301,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SO
         self.password_entry.delete(0, tk.END)
         self.username = username
         self.password = password
+        self.proxy_type = proxy_type
+        self.proxy_address = proxy_address
+        self.proxy_port = proxy_port
+        self.proxy_needs_auth = proxy_needs_auth
         self.connected = True
 
         self.proxy_status_label.config(text="Upstream proxy: Connected")
@@ -246,16 +314,21 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SO
 
     def start_proxy(self):
         if not self.connected:
-
+            if not self.proxy_type or not self.proxy_address or not self.proxy_port or not self.proxy_needs_auth:
+                messagebox.showerror("Proxy", "Enter the upstream proxy details first.")
+                return
             if NEEDS_AUTH and (not self.username or not self.password):
                 messagebox.showerror("Proxy", "Log in to the upstream proxy first.")
+                return
+            if BYPASS_PROXY and not self.username or not self.password:
+                messagebox.showerror("Proxy", "Enter the upstream proxy credentials first.")
                 return
 
         if self.server is not None:
             return
 
         try:
-            server = LocalProxyServer((LOCAL_HOST, LOCAL_PORT), self.username, self.password)
+            server = LocalProxyServer((LOCAL_HOST, LOCAL_PORT), self.username, self.password, self.proxy_type, self.proxy_address, self.proxy_port, self.proxy_needs_auth, bypass_proxy=self.bypass_proxy)
         except OSError as exc:
             messagebox.showerror("Proxy", f"Could not start local proxy: {exc}")
             return
@@ -288,7 +361,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SO
         if not messagebox.askyesno("Delete Credentials", "Delete the saved upstream proxy credentials?"):
             return
 
-        for account in ("username", "password"):
+        for account in ("username", "password", "proxy_type", "proxy_address", "proxy_port", "proxy_needs_auth"):
             try:
                 keyring.delete_password(SERVICE, account)
             except keyring.errors.PasswordDeleteError:
@@ -299,6 +372,10 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SO
 
         self.username = None
         self.password = None
+        self.proxy_type = None
+        self.proxy_address = None
+        self.proxy_port = None
+        self.proxy_needs_auth = None
         self.connected = False
 
         self.username_entry.delete(0, tk.END)
@@ -315,4 +392,4 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SO
 
 
 if __name__ == "__main__":
-    MiddleMan().mainloop()
+    MiddleMan(True).mainloop()
