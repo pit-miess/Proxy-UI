@@ -7,7 +7,7 @@ import keyring
 import keyring.errors
 import requests
 
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 
 class ScrollableFrame(ttk.Frame):
     def __init__(self, parent, *args, **kwargs):
