@@ -392,4 +392,4 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SO
 
 
 if __name__ == "__main__":
-    MiddleMan(True).mainloop()
+    MiddleMan().mainloop()
