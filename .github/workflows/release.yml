@@ -1,4 +1,3 @@
-
 name: Build and Release
 
 on:
@@ -30,11 +29,11 @@ jobs:
       - name: Install WiX Toolset
         shell: pwsh
         run: |
-          dotnet tool install --global wix --version 4.0.5
+          dotnet tool install --global wix --version 5.0.2
           "$env:USERPROFILE\.dotnet\tools" |
             Out-File -FilePath $env:GITHUB_PATH -Append
 
-          wix extension add --global WixToolset.UI.wixext/4.0.5
+          wix extension add --global WixToolset.UI.wixext/5.0.2
 
       - name: Install dependencies
         shell: pwsh
@@ -44,6 +43,30 @@ jobs:
             python -m pip install -r requirements.txt
           }
           python -m pip install pyinstaller
+
+      - name: Convert License to RTF
+        shell: pwsh
+        run: |
+          $licenseText = Get-Content LICENSE -Raw
+
+          # Escape RTF special characters.
+          $licenseText = $licenseText.Replace('\', '\\')
+          $licenseText = $licenseText.Replace('{', '\{')
+          $licenseText = $licenseText.Replace('}', '\}')
+
+          # Convert line breaks to RTF paragraph breaks.
+          $licenseText = $licenseText -replace "`r`n|`n|`r", '\par '
+
+          $rtfHeader = '{\rtf1\ansi\deff0{\fonttbl{\f0\fswiss Helvetica;}}\f0\fs20 '
+          $rtfFooter = '\par}'
+
+          $rtf = $rtfHeader + $licenseText + $rtfFooter
+
+          [System.IO.File]::WriteAllText(
+            "LICENSE.rtf",
+            $rtf,
+            [System.Text.Encoding]::ASCII
+          )
 
       - name: Build EXE
         run: |
@@ -70,7 +93,7 @@ jobs:
 
           wix build installer.wxs `
             -arch x64 `
-            -ext WixToolset.UI.wixext/4.0.5 `
+            -ext WixToolset.UI.wixext/5.0.2 `
             -d "PublishDir=dist/Proxy-UI-standalone-windows" `
             -d "ProductVersion=$version" `
             -o "dist/Proxy-UI-setup-windows.msi"

@@ -1,0 +1,27 @@
+#FIX LICENSE
+$inputFile = "LICENSE"
+$outputFile = "LICENSE.rtf"
+
+$text = Get-Content $inputFile -Raw
+
+$escaped = $text.Replace('\', '\\').Replace('{', '\{').Replace('}', '\}')
+
+$escaped = $escaped -replace "`r`n|`n|`r", '\par ' 
+
+$rtf = "{\rtf1\ansi\deff0 {\fonttbl {\f0 Arial;}}\f0\fs20 " +
+       $escaped +
+       "\par}"
+
+[System.IO.File]::WriteAllText(
+    $outputFile,
+    $rtf,
+    [System.Text.Encoding]::ASCII
+)
+
+Write-Host "Created $outputFile"
+
+
+
+
+
+wix build installer.wxs -arch x64 -ext WixToolset.UI.wixext/5.0.2 -d "PublishDir=$publishPath" -d "ProductVersion=1.2.3" -o "dist/Proxy-UI-setup-windows.msi"

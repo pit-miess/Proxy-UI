@@ -22,9 +22,6 @@
     <Icon
       Id="ProxyUIIcon"
       SourceFile="icon.ico" />
-    <Property
-      Id="WIXUI_INSTALLDIR"
-      Value="INSTALLFOLDER" />
 
     <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="INSTALLFOLDER" Name="Proxy-UI" />
@@ -68,21 +65,18 @@
     <ui:WixUI
       Id="WixUI_InstallDir"
       InstallDirectory="INSTALLFOLDER" />
-
+    <WixVariable
+      Id="WixUILicenseRtf"
+      Value="LICENSE.rtf" />
   </Package>
 
   <Fragment>
-    <ComponentGroup
-      Id="ApplicationFiles"
-      Directory="INSTALLFOLDER">
+  <ComponentGroup
+    Id="ApplicationFiles"
+    Directory="INSTALLFOLDER">
 
-      <Files Include="$(var.PublishDir)\**" />
+    <Files Include="$(var.PublishDir)\**" />
 
-    </ComponentGroup>
-  </Fragment>
-
-  <WixVariable
-    Id="WixUILicenseRtf"
-    Value="LICENSE.rtf" />
-
+  </ComponentGroup>
+</Fragment>
 </Wix>
