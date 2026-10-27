@@ -11,7 +11,7 @@ import base64
 import os
 import requests
 
-VERSION = "2.0.0"
+VERSION = "2.0.1"
 
 class ScrollableFrame(ttk.Frame):
     def __init__(self, parent, *args, **kwargs):
