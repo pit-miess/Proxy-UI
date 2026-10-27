@@ -11,7 +11,7 @@ import base64
 import os
 import requests
 
-VERSION = "2.0.1"
+VERSION = "2.0.2"
 
 class ScrollableFrame(ttk.Frame):
     def __init__(self, parent, *args, **kwargs):
@@ -249,6 +249,13 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SO
             "username": self.username_entry.get(),
             "password": self.password_entry.get()
         }
+        self.proxy_name_entry.delete(0, "end")
+        self.proxy_address_entry.delete(0, "end")
+        self.proxy_port_entry.delete(0, "end")
+        self.username_entry.delete(0, "end")
+        self.password_entry.delete(0, "end")
+        self.needs_auth_var.set(True)
+        self.error_label.config(text="")
         self.switch_page("Proxy Selection")
         self.reload_proxy_selection()
         self.save()
@@ -295,6 +302,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SO
             delete_button.pack(side="left", padx=5)
             select = ttk.Button(frame, text="Select", command=lambda name=proxy_name: self.select_called(name))
             select.pack(side="left", padx=5)
+        self.new_proxy_button = ttk.Button(self.proxy_selection_frame.scrollable_frame, text="Add New Proxy", command=lambda: self.switch_page("New Proxy"))
+        self.new_proxy_button.pack(pady=5)
     def edit_proxy(self, proxy_name):
         proxy_data = self.proxies[proxy_name]
         self.proxy_name_entry.delete(0, "end")
@@ -312,7 +321,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SO
         if proxy_data["password"]:
             self.password_entry.insert(0, proxy_data["password"])
         self.switch_page("New Proxy")
-        self.save()
     def delete_proxy(self, proxy_name):
         if messagebox.askyesno("Delete Proxy", f"Are you sure you want to delete the proxy '{proxy_name}'?"):
             del self.proxies[proxy_name]
