@@ -1,0 +1,90 @@
+
+<?xml version="1.0" encoding="UTF-8"?>
+
+<Wix
+  xmlns="http://wixtoolset.org/schemas/v4/wxs"
+  xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+
+  <Package
+    Name="Proxy-UI"
+    Manufacturer="Proxy-UI"
+    Version="$(var.ProductVersion)"
+    UpgradeCode="8A5B6C7D-1234-4567-8901-123456789ABC"
+    Scope="perMachine"
+    InstallerVersion="500">
+
+    <SummaryInformation
+      Description="Proxy-UI Windows Installer"
+      Manufacturer="Proxy-UI" />
+
+    <MajorUpgrade
+      DowngradeErrorMessage="A newer version of Proxy-UI is already installed." />
+
+    <MediaTemplate EmbedCab="yes" />
+    <Icon
+      Id="ProxyUIIcon"
+      SourceFile="icon.ico" />
+    <Property
+      Id="WIXUI_INSTALLDIR"
+      Value="INSTALLFOLDER" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="Proxy-UI" />
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ApplicationProgramsFolder" Name="Proxy-UI" />
+    </StandardDirectory>
+
+    <Feature Id="MainFeature" Title="Proxy-UI" Level="1">
+      <ComponentGroupRef Id="ApplicationFiles" />
+      <ComponentRef Id="StartMenuShortcut" />
+    </Feature>
+
+    <Component
+      Id="StartMenuShortcut"
+      Directory="ApplicationProgramsFolder"
+      Guid="*">
+
+      <Shortcut
+        Id="ApplicationShortcut"
+        Name="Proxy-UI"
+        Description="Launch Proxy-UI"
+        Target="[INSTALLFOLDER]Proxy-UI-standalone-windows.exe"
+        WorkingDirectory="INSTALLFOLDER" />
+
+      <RemoveFolder
+        Id="RemoveApplicationProgramsFolder"
+        On="uninstall" />
+
+      <RegistryValue
+        Root="HKLM"
+        Key="Software\Proxy-UI"
+        Name="Installed"
+        Type="integer"
+        Value="1"
+        KeyPath="yes" />
+
+    </Component>
+
+    <ui:WixUI
+      Id="WixUI_InstallDir"
+      InstallDirectory="INSTALLFOLDER" />
+
+  </Package>
+
+  <Fragment>
+    <ComponentGroup
+      Id="ApplicationFiles"
+      Directory="INSTALLFOLDER">
+
+      <Files Include="$(var.PublishDir)\**" />
+
+    </ComponentGroup>
+  </Fragment>
+
+  <WixVariable
+    Id="WixUILicenseRtf"
+    Value="LICENSE.rtf" />
+
+</Wix>

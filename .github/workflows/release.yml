@@ -21,6 +21,20 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.13"
+      
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.x"
+
+      - name: Install WiX Toolset
+        shell: pwsh
+        run: |
+          dotnet tool install --global wix --version 4.0.5
+          "$env:USERPROFILE\.dotnet\tools" |
+            Out-File -FilePath $env:GITHUB_PATH -Append
+
+          wix extension add --global WixToolset.UI.wixext/4.0.5
 
       - name: Install dependencies
         shell: pwsh
@@ -33,12 +47,34 @@ jobs:
 
       - name: Build EXE
         run: |
-          pyinstaller --noconsole --onefile --name "Proxy-UI-onefile-windows" "main.py"
+          pyinstaller --noconsole --onefile --name "Proxy-UI-onefile-windows" --icon icon.ico "main.py"
 
       - name: Build Standalone EXE
         run: |
-          pyinstaller --noconsole --onedir --name "Proxy-UI-standalone-windows" "main.py"
+          pyinstaller --noconsole --onedir --name "Proxy-UI-standalone-windows" --icon icon.ico "main.py"
+      
+      - name: Create MSI Installer
+        shell: pwsh
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          $match = [regex]::Match(
+            $tag,
+            '^v?(\d+)\.(\d+)\.(\d+)$'
+          )
 
+          if (-not $match.Success) {
+            throw "Use a stable version tag such as v1.2.3 for MSI releases."
+          }
+
+          $version = "$($match.Groups[1].Value).$($match.Groups[2].Value).$($match.Groups[3].Value)"
+
+          wix build installer.wxs `
+            -arch x64 `
+            -ext WixToolset.UI.wixext/4.0.5 `
+            -d "PublishDir=dist/Proxy-UI-standalone-windows" `
+            -d "ProductVersion=$version" `
+            -o "dist/Proxy-UI-setup-windows.msi"
+      
       - name: Zip Standalone Build
         run: |
           Compress-Archive `
@@ -51,6 +87,7 @@ jobs:
           name: windows-build
           path: |
             dist/Proxy-UI-onefile-windows.exe
+            dist/Proxy-UI-setup-windows.msi
             dist/Proxy-UI-standalone-windows.zip
 
   build-linux:
@@ -76,12 +113,12 @@ jobs:
       - name: Build Linux Executable
         run: |
           pyinstaller --noconsole --onefile \
-            --name "Proxy-UI-onefile-linux" main.py
+            --name "Proxy-UI-onefile-linux" --icon icon.ico main.py
 
       - name: Build Linux Standalone
         run: |
           pyinstaller --noconsole --onedir \
-            --name "Proxy-UI-standalone-linux" main.py
+            --name "Proxy-UI-standalone-linux" --icon icon.ico main.py
 
       - name: Archive Linux Standalone
         run: |
@@ -128,6 +165,7 @@ jobs:
             echo
             echo "### Downloads"
             echo "- **Windows (single executable):** \`Proxy-UI-onefile-windows.exe\`"
+            echo "- **RECOMMMENDED Windows (MSI installer):** \`Proxy-UI-setup-windows.msi\`"
             echo "- **Windows (standalone):** \`Proxy-UI-standalone-windows.zip\`"
             echo "- **Linux (single executable):** \`Proxy-UI-onefile-linux\`"
             echo "- **Linux (standalone):** \`Proxy-UI-standalone-linux.tar.gz\`"
@@ -161,6 +199,7 @@ jobs:
           fail_on_unmatched_files: true
           files: |
             dist/Proxy-UI-onefile-windows.exe
+            dist/Proxy-UI-setup-windows.msi
             dist/Proxy-UI-standalone-windows.zip
             dist/Proxy-UI-onefile-linux
             dist/Proxy-UI-standalone-linux.tar.gz
