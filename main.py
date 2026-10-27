@@ -457,12 +457,21 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SO
         self.start_button.config(state="normal")
         self.stop_button.config(state="disabled")
 
-
     def on_close(self):
         if self.server is not None:
             self.stop_proxy()
+        if self.proxies and self.password:
+            self.save()
         self.destroy()
+    def run(self):
+        self.mainloop()
 
 
 if __name__ == "__main__":
-    MiddleMan(True).mainloop()
+    args = sys.argv[1:]
+    bypass_proxy = False
+    for arg in args:
+        if arg in ("-d", "--d", "-debug", "--debug"):
+            bypass_proxy = True
+    ui = MiddleMan(bypass_proxy=bypass_proxy)
+    ui.run()
